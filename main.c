@@ -158,6 +158,8 @@ void parse_arguments(int argc, char **argv)
 
 static void print_multiple(int n, char c)
 {
+	if (n <= 0)
+		return;
 	char s[n + 1];
 	for (int i = 0; i < n; ++i)
 		s[i] = c;
