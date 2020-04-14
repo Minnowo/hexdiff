@@ -101,6 +101,8 @@ static int opt_highlight_col = 0;
 // color will be used to highlight the changed bytes
 static bool opt_highlight_fg = false;
 
+static uint64_t largest_file_size = 0;
+
 #define MAX_FILES 32
 static struct file_t files[MAX_FILES];
 static int files_count = 0;
@@ -163,8 +165,10 @@ static void print_multiple(int n, char c)
 	printf(s);
 }
 
-static void print_file_names()
+static void print_file_names(int left_margin)
 {
+	print_multiple(left_margin, ' ');
+
 	for (int f = 0; f < files_count; ++f) {
 		const char *nm = files[f].name;
 		int l = strlen(nm);
@@ -206,13 +210,23 @@ int main(int argc, char **argv)
 		file.buffer = (uint8_t *)malloc(READ_BUFFER_SIZE);
 
 		files[f] = file;
+
+		if (largest_file_size < file.size)
+			largest_file_size = file.size;
 	}
 
+	int address_digits = 0;
+	uint64_t s = largest_file_size;
+	do {
+		s /= 16;
+		++address_digits;
+	} while (s > 1);
+
 	/* Print the file names */
-	print_file_names();
+	print_file_names(address_digits + 2);
 
 	/* Read 16 bytes at a time from file buffer */
-	for (;;) {
+	for (uint64_t index;; index += 16) {
 		// 16 bytes from each file
 		// values of -1 on EOF
 		int bytes[16][files_count];
@@ -259,6 +273,9 @@ int main(int argc, char **argv)
 				}
 			}
 		}
+
+		// Print the line address
+		printf("%0*lX: ", address_digits, index);
 
 		// Print the line of bytes
 		printf("\e[%dm", COL_RESET);
