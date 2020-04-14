@@ -7,8 +7,41 @@ typedef uint8_t bool;
 #define true 1
 #define false 0
 
-#define COL_RED "\e[31m"
-#define COL_RESET "\e[39m"
+// ANSI color escape codes
+enum
+{
+	COL_RESET     =  0,
+	COL_FG_RED    = 31,
+	COL_FG_GREEN  = 32,
+	COL_FG_YELLOW = 33,
+	COL_FG_BLUE   = 34,
+	COL_FG_PURPLE = 35,
+	COL_FG_TEAL   = 36,
+	COL_BG_RED    = 41,
+	COL_BG_GREEN  = 42,
+	COL_BG_YELLOW = 43,
+	COL_BG_BLUE   = 44,
+	COL_BG_PURPLE = 45,
+	COL_BG_TEAL   = 46,
+};
+
+static int colors_rainbow_fg[] = {
+	COL_FG_RED,
+	COL_FG_GREEN,
+	COL_FG_YELLOW,
+	COL_FG_BLUE,
+	COL_FG_PURPLE,
+	COL_FG_TEAL,
+};
+
+static int colors_rainbow_bg[] = {
+	COL_BG_RED,
+	COL_BG_GREEN,
+	COL_BG_YELLOW,
+	COL_BG_BLUE,
+	COL_BG_PURPLE,
+	COL_BG_TEAL,
+};
 
 static const int READ_BUFFER_SIZE = 4096;
 
@@ -17,9 +50,8 @@ static void print_usage(const char *arg0, FILE *file)
 	fprintf(file, "Usage: %s file1 file2 ...\n", arg0);
 }
 
-static void print_byte(int byte, bool diff)
+static void print_byte(int byte)
 {
-	const char *str = diff ? COL_RED : COL_RESET;
 	char c[2];
 	if (byte < 0 || byte > 0xFF) {
 		c[0] = c[1] = '-';
@@ -28,7 +60,7 @@ static void print_byte(int byte, bool diff)
 		c[0] = hex[byte >> 4];
 		c[1] = hex[byte & 0xF];
 	}
-	printf("%s%c%c", str, c[0], c[1]);
+	printf("%c%c", c[0], c[1]);
 }
 
 struct file_t
@@ -129,9 +161,17 @@ int main(int argc, char **argv)
 		}
 
 		// Print the line of bytes
+		printf("\e[%dm", COL_RESET);
 		for (int f = 0; f < files_count; ++f) {
+			int color_index = 0;
 			for (int i = 0; i < 16; ++i) {
-				print_byte(bytes[i][f], diff[i]);
+				if (diff[i]) {
+					printf("\e[%dm", colors_rainbow_bg[color_index++]);
+					color_index %= sizeof(colors_rainbow_bg) / sizeof(int);
+				}
+				print_byte(bytes[i][f]);
+				if (diff[i])
+					printf("\e[%dm", COL_RESET);
 
 				const char *str;
 				if (i == 15)
