@@ -11,6 +11,7 @@ typedef uint8_t bool;
 enum
 {
 	COL_RESET     =  0,
+	COL_UNDERLINE =  4,
 	COL_FG_RED    = 31,
 	COL_FG_GREEN  = 32,
 	COL_FG_YELLOW = 33,
@@ -43,11 +44,25 @@ static int colors_rainbow_bg[] = {
 	COL_BG_TEAL,
 };
 
-static const int READ_BUFFER_SIZE = 4096;
-
 static void print_usage(const char *arg0, FILE *file)
 {
-	fprintf(file, "Usage: %s file1 file2 ...\n", arg0);
+	const char *help =
+		"Usage: %s [OPTIONS] file1 file2 ... fileN\n"
+		"\n"
+		"  --help             Show this message\n"
+		"\n"
+		"  --no-color         Disables the highlighting of the changed bytes\n"
+		"                     The changed bytes will be \e[4munderlined\e[0m instead\n"
+		"\n"
+		"  --color=COLOR      Highlight the changed bytes with the color COLOR.\n"
+		"                     The Possible values are:\n"
+		"                       rainbow [DEFAULT] - alternating colors,\n"
+		"                       red, green, yellow, blue, purple or teal\n"
+		"\n"
+		"  --colorfg          Color the text instead of the background\n"
+		"\n"
+		"  --                 Everything after this argument will be treated as a file\n";
+	fprintf(file, help, arg0);
 }
 
 static void print_byte(int byte)
@@ -65,6 +80,7 @@ static void print_byte(int byte)
 
 struct file_t
 {
+	const char *name; // The name of the file
 	uint64_t pos;     // Current position in file
 	uint64_t size;    // The size of the file
 	FILE *descriptor; // The file descriptor
@@ -73,28 +89,84 @@ struct file_t
 	uint8_t *buffer;
 };
 
+static const int READ_BUFFER_SIZE = 4096;
+
+// How to 'highlight' the changed bytes
+// -1 - Use underlines
+//  0 - Rainbow
+//  1, 2, 3, 4, 5, 6 - red, green, yellow, blue, purple, teal
+static int opt_highlight_col = 0;
+
+// Select whenether the foreground or background
+// color will be used to highlight the changed bytes
+static bool opt_highlight_fg = false;
+
+#define MAX_FILES 32
+static struct file_t files[MAX_FILES];
+static int files_count = 0;
+
+void parse_arguments(int argc, char **argv)
+{
+	bool as_files = false;
+
+	for (int i = 1; i < argc; ++i) {
+		const char *a = argv[i];
+
+		if (!strncmp(a, "--", 2) && !as_files) {
+			if (!strcmp(a, "--help")) {
+				print_usage(argv[0], stdout);
+				exit(0);
+			} else if (!strcmp(a, "--no-color")) {
+				opt_highlight_col = -1;
+			} else if (!strncmp(a, "--color=", 8)) {
+				static const char *args[] = {
+					"rainbow", "red", "green", "yellow", "blue", "purple", "teal",
+				};
+				int val = -1;
+				for (unsigned int i = 0; i < sizeof(args) / sizeof(const char *); ++i) {
+					if (!strcmp(a + 8, args[i])) {
+						val = i;
+						break;
+					}
+				}
+				if (val == -1) {
+					fprintf(stderr, "Invalid argument '%s' to --color\n", a + 8);
+					print_usage(argv[0], stderr);
+					exit(1);
+				}
+				opt_highlight_col = val;
+			} else if (!strcmp(a, "--colorfg")) {
+				opt_highlight_fg = true;
+			} else if (!strcmp(a, "--")) {
+				as_files = true;
+			} else {
+				fprintf(stderr, "Invalid option: %s\n", a);
+				print_usage(argv[0], stderr);
+				exit(1);
+			}
+		} else {
+			if (files_count == MAX_FILES) {
+				fprintf(stderr, "Cannot diff more than %d files\n", MAX_FILES);
+				exit(1);
+			}
+			files[files_count++].name = a;
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
-	/* Check for 'help' arguments */
-
-	if (argc <= 1) {
+	/* Parse command line arguments */
+	parse_arguments(argc, argv);
+	if (files_count == 0) {
 		print_usage(argv[0], stderr);
 		return 1;
 	}
 
-	if (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h")) {
-		print_usage(argv[0], stdout);
-		return 0;
-	}
-
 	/* Open the input files */
-
-	const int files_count = argc - 1;
-	struct file_t files[files_count];
-
 	for (int f = 0; f < files_count; ++f) {
 		struct file_t file;
-		file.descriptor = fopen(argv[f + 1], "rb");
+		file.descriptor = fopen(files[f].name, "rb");
 		if (file.descriptor == NULL) {
 			perror("Failed to open file"); // TODO: error message
 			// TODO: cleanup
@@ -166,8 +238,24 @@ int main(int argc, char **argv)
 			int color_index = 0;
 			for (int i = 0; i < 16; ++i) {
 				if (diff[i]) {
-					printf("\e[%dm", colors_rainbow_bg[color_index++]);
-					color_index %= sizeof(colors_rainbow_bg) / sizeof(int);
+					int code;
+					if (opt_highlight_col == -1) {
+						code = COL_UNDERLINE;
+					} else if (opt_highlight_col == 0) {
+						if (opt_highlight_fg) {
+							code = colors_rainbow_fg[color_index++];
+							color_index %= sizeof(colors_rainbow_fg) / sizeof(int);
+						} else {
+							code = colors_rainbow_bg[color_index++];
+							color_index %= sizeof(colors_rainbow_bg) / sizeof(int);
+						}
+					} else {
+						if (opt_highlight_fg)
+							code = colors_rainbow_fg[opt_highlight_col - 1];
+						else
+							code = colors_rainbow_bg[opt_highlight_col - 1];
+					}
+					printf("\e[%dm", code);
 				}
 				print_byte(bytes[i][f]);
 				if (diff[i])
