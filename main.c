@@ -227,6 +227,18 @@ int main(int argc, char **argv)
 
 	/* Read 16 bytes at a time from file buffer */
 	for (uint64_t index;; index += 16) {
+		// Check if all files are fully read
+		bool eof = true;
+		for (int f = 0; f < files_count; ++f) {
+			if (files[f].buffer_index != files[f].buffer_size ||
+					files[f].pos != files[f].size) {
+				eof = false;
+				break;
+			}
+		}
+		if (eof)
+			break;
+
 		// 16 bytes from each file
 		// values of -1 on EOF
 		int bytes[16][files_count];
@@ -250,17 +262,6 @@ int main(int argc, char **argv)
 				bytes[i][f] = files[f].buffer[files[f].buffer_index++];
 			}
 		}
-
-		// Check if all files are fully read
-		bool eof = true;
-		for (int f = 0; f < files_count; ++f) {
-			if (files[f].buffer_index != files[f].buffer_size) {
-				eof = false;
-				break;
-			}
-		}
-		if (eof)
-			break;
 
 		// diff[i] will be true is the ith byte is different
 		// for at least two files
