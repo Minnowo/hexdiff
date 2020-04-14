@@ -154,6 +154,31 @@ void parse_arguments(int argc, char **argv)
 	}
 }
 
+static void print_multiple(int n, char c)
+{
+	char s[n + 1];
+	for (int i = 0; i < n; ++i)
+		s[i] = c;
+	s[n] = '\0';
+	printf(s);
+}
+
+static void print_file_names()
+{
+	for (int f = 0; f < files_count; ++f) {
+		const char *nm = files[f].name;
+		int l = strlen(nm);
+		const int space = 3*16;
+		int padding_left = (space - l) / 2;
+		int padding_right = space - padding_left - l;
+		print_multiple(padding_left, '-');
+		printf("%s", nm);
+		print_multiple(padding_right, '-');
+		printf("    ");
+	}
+	printf("\n");
+}
+
 int main(int argc, char **argv)
 {
 	/* Parse command line arguments */
@@ -165,8 +190,8 @@ int main(int argc, char **argv)
 
 	/* Open the input files */
 	for (int f = 0; f < files_count; ++f) {
-		struct file_t file;
-		file.descriptor = fopen(files[f].name, "rb");
+		struct file_t file = files[f];
+		file.descriptor = fopen(file.name, "rb");
 		if (file.descriptor == NULL) {
 			perror("Failed to open file"); // TODO: error message
 			// TODO: cleanup
@@ -182,6 +207,9 @@ int main(int argc, char **argv)
 
 		files[f] = file;
 	}
+
+	/* Print the file names */
+	print_file_names();
 
 	/* Read 16 bytes at a time from file buffer */
 	for (;;) {
