@@ -178,7 +178,10 @@ static void print_file_names(int left_margin)
 		int padding_left = (space - l) / 2;
 		int padding_right = space - padding_left - l;
 		print_multiple(padding_left, '-');
-		printf("%s", nm);
+		if (l <= space)
+			printf("%s", nm);
+		else
+			printf("...%s", nm + l - space + 3);
 		print_multiple(padding_right, '-');
 		printf("    ");
 	}
