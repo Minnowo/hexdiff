@@ -227,6 +227,8 @@ int main(int argc, char **argv)
 		++address_digits;
 	} while (s > 1);
 
+	uint64_t differentBytesCount = 0;
+
 	/* Print the file names */
 	print_file_names(address_digits + 2);
 
@@ -268,12 +270,14 @@ int main(int argc, char **argv)
 			}
 		}
 
+		// Compare each of the 16 bytes between all files
 		// diff[i] will be true is the ith byte is different
 		// for at least two files
 		bool diff[16] = {false};
 		for (int i = 0; i < 16; ++i) {
 			for (int f = 0; f < files_count - 1; ++f) {
 				if (bytes[i][f] != bytes[i][f + 1]) {
+					++differentBytesCount;
 					diff[i] = true;
 					break;
 				}
@@ -326,6 +330,9 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+
+	// Print summary
+	printf("\nDifferent bytes: %ld\n", differentBytesCount);
 
 	// Close all open files
 	for (int f = 0; f < files_count; ++f) {
