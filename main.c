@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 
 typedef uint8_t bool;
 #define true 1
@@ -202,7 +203,7 @@ int main(int argc, char **argv)
 		struct file_t file = files[f];
 		file.descriptor = fopen(file.name, "rb");
 		if (file.descriptor == NULL) {
-			perror("Failed to open file"); // TODO: error message
+			fprintf(stderr, "Failed to open file '%s': %s\n", file.name, strerror(errno));
 			// TODO: cleanup
 			return 2;
 		}
