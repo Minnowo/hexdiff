@@ -62,6 +62,8 @@ static void print_usage(const char *arg0, FILE *file)
 		"\n"
 		"  --colorfg          Color the text instead of the background\n"
 		"\n"
+		"  --noskipeq           Skip lines that have no differences\n"
+		"\n"
 		"  --                 Everything after this argument will be treated as a file\n";
 	fprintf(file, help, arg0);
 }
@@ -69,9 +71,12 @@ static void print_usage(const char *arg0, FILE *file)
 static void print_byte(int byte)
 {
 	char c[2];
-	if (byte < 0 || byte > 0xFF) {
+	if (byte < 0 || byte > 0xFF) 
+    {
 		c[0] = c[1] = '-';
-	} else {
+	} 
+    else 
+    {
 		static const char hex[17] = "0123456789ABCDEF";
 		c[0] = hex[byte >> 4];
 		c[1] = hex[byte & 0xF];
@@ -98,6 +103,8 @@ static const int READ_BUFFER_SIZE = 4096;
 //  1, 2, 3, 4, 5, 6 - red, green, yellow, blue, purple, teal
 static int opt_highlight_col = 0;
 
+static bool skip_equal_lines = true;
+
 // Select whenether the foreground or background
 // color will be used to highlight the changed bytes
 static bool opt_highlight_fg = false;
@@ -112,43 +119,69 @@ void parse_arguments(int argc, char **argv)
 {
 	bool as_files = false;
 
-	for (int i = 1; i < argc; ++i) {
+	for (int i = 1; i < argc; ++i) 
+    {
 		const char *a = argv[i];
 
-		if (!strncmp(a, "--", 2) && !as_files) {
-			if (!strcmp(a, "--help")) {
+		if (!strncmp(a, "--", 2) && !as_files) 
+        {
+			if (!strcmp(a, "--help")) 
+            {
 				print_usage(argv[0], stdout);
 				exit(0);
-			} else if (!strcmp(a, "--no-color")) {
+			} 
+            else if (!strcmp(a, "--no-color")) 
+            {
 				opt_highlight_col = -1;
-			} else if (!strncmp(a, "--color=", 8)) {
-				static const char *args[] = {
+			} 
+            else if (!strncmp(a, "--color=", 8)) 
+            {
+				static const char *args[] = 
+                {
 					"rainbow", "red", "green", "yellow", "blue", "purple", "teal",
 				};
+
 				int val = -1;
-				for (unsigned int i = 0; i < sizeof(args) / sizeof(const char *); ++i) {
-					if (!strcmp(a + 8, args[i])) {
+				for (unsigned int i = 0; i < sizeof(args) / sizeof(const char *); ++i) 
+                {
+					if (!strcmp(a + 8, args[i])) 
+                    {
 						val = i;
 						break;
 					}
 				}
-				if (val == -1) {
+
+				if (val == -1) 
+                {
 					fprintf(stderr, "Invalid argument '%s' to --color\n", a + 8);
 					print_usage(argv[0], stderr);
 					exit(1);
 				}
 				opt_highlight_col = val;
-			} else if (!strcmp(a, "--colorfg")) {
+			} 
+            else if (!strcmp(a, "--colorfg")) 
+            {
 				opt_highlight_fg = true;
-			} else if (!strcmp(a, "--")) {
+			} 
+            else if (!strcmp(a, "--noskipeq"))
+            {
+                skip_equal_lines = false;
+            }
+            else if (!strcmp(a, "--")) 
+            {
 				as_files = true;
-			} else {
+			} 
+            else 
+            {
 				fprintf(stderr, "Invalid option: %s\n", a);
 				print_usage(argv[0], stderr);
 				exit(1);
 			}
-		} else {
-			if (files_count == MAX_FILES) {
+		} 
+        else 
+        {
+			if (files_count == MAX_FILES) 
+            {
 				fprintf(stderr, "Cannot diff more than %d files\n", MAX_FILES);
 				exit(1);
 			}
@@ -161,9 +194,12 @@ static void print_multiple(int n, char c)
 {
 	if (n <= 0)
 		return;
+
 	char s[n + 1];
+
 	for (int i = 0; i < n; ++i)
 		s[i] = c;
+
 	s[n] = '\0';
 	printf(s);
 }
@@ -172,7 +208,8 @@ static void print_file_names(int left_margin)
 {
 	print_multiple(left_margin, ' ');
 
-	for (int f = 0; f < files_count; ++f) {
+	for (int f = 0; f < files_count; ++f) 
+    {
 		const char *nm = files[f].name;
 		int l = strlen(nm);
 		const int space = 3*16;
@@ -193,20 +230,25 @@ int main(int argc, char **argv)
 {
 	/* Parse command line arguments */
 	parse_arguments(argc, argv);
-	if (files_count == 0) {
+	if (files_count == 0) 
+    {
 		print_usage(argv[0], stderr);
 		return 1;
 	}
 
 	/* Open the input files */
-	for (int f = 0; f < files_count; ++f) {
+	for (int f = 0; f < files_count; ++f) 
+    {
 		struct file_t file = files[f];
 		file.descriptor = fopen(file.name, "rb");
-		if (file.descriptor == NULL) {
+
+		if (file.descriptor == NULL) 
+        {
 			fprintf(stderr, "Failed to open file '%s': %s\n", file.name, strerror(errno));
 			// TODO: cleanup
 			return 2;
 		}
+
 		file.pos = 0;
 		fseek(file.descriptor, 0, SEEK_END);
 		file.size = ftell(file.descriptor);
@@ -223,23 +265,28 @@ int main(int argc, char **argv)
 
 	int address_digits = 0;
 	uint64_t s = largest_file_size;
-	do {
+	do 
+    {
 		s /= 16;
 		++address_digits;
-	} while (s > 1);
+	} 
+    while (s > 1);
 
 	uint64_t differentBytesCount = 0;
 
 	/* Print the file names */
 	print_file_names(address_digits + 2);
 
+    long skip_diff = 0;
 	/* Read 16 bytes at a time from file buffer */
-	for (uint64_t index;; index += 16) {
+	for (uint64_t index;; index += 16) 
+    {
 		// Check if all files are fully read
 		bool eof = true;
-		for (int f = 0; f < files_count; ++f) {
-			if (files[f].buffer_index != files[f].buffer_size ||
-					files[f].pos != files[f].size) {
+		for (int f = 0; f < files_count; ++f) 
+        {
+			if (files[f].buffer_index != files[f].buffer_size ||files[f].pos != files[f].size) 
+            {
 				eof = false;
 				break;
 			}
@@ -252,21 +299,27 @@ int main(int argc, char **argv)
 		int bytes[16][files_count];
 
 		// Read 16 bytes from each buffer
-		for (int i = 0; i < 16; ++i) {
-			for (int f = 0; f < files_count; ++f) {
+		for (int i = 0; i < 16; ++i) 
+        {
+			for (int f = 0; f < files_count; ++f) 
+            {
 				// If the buffer is 'empty', then read from the actual
 				// file and fill in the buffer
-				if (files[f].buffer_index == files[f].buffer_size) {
-					if (files[f].pos == files[f].size) {
+				if (files[f].buffer_index == files[f].buffer_size) 
+                {
+					if (files[f].pos == files[f].size) 
+                    {
 						bytes[i][f] = -1;
 						continue;
 					}
+
 					// TODO: error check
 					int b = fread(files[f].buffer, 1, READ_BUFFER_SIZE, files[f].descriptor);
 					files[f].pos += b;
 					files[f].buffer_size = b;
 					files[f].buffer_index = 0;
 				}
+
 				bytes[i][f] = files[f].buffer[files[f].buffer_index++];
 			}
 		}
@@ -275,37 +328,66 @@ int main(int argc, char **argv)
 		// diff[i] will be true is the ith byte is different
 		// for at least two files
 		bool diff[16] = {false};
-		for (int i = 0; i < 16; ++i) {
-			for (int f = 0; f < files_count - 1; ++f) {
-				if (bytes[i][f] != bytes[i][f + 1]) {
+        bool equal_line = true;
+
+		for (int i = 0; i < 16; ++i) 
+        {
+			for (int f = 0; f < files_count - 1; ++f) 
+            {
+				if (bytes[i][f] != bytes[i][f + 1]) 
+                {
 					++differentBytesCount;
 					diff[i] = true;
+                    equal_line = false;
 					break;
 				}
 			}
 		}
+
+        if (skip_equal_lines && equal_line)
+        {
+            skip_diff += 16;
+            continue;
+        }
+        
+        if(skip_diff != 0)
+        {
+            printf("Skipped: %i bytes \n", skip_diff);
+            skip_diff = 0;
+        }
 
 		// Print the line address
 		printf("%0*lX: ", address_digits, index);
 
 		// Print the line of bytes
 		printf("\e[%dm", COL_RESET);
-		for (int f = 0; f < files_count; ++f) {
+		for (int f = 0; f < files_count; ++f) 
+        {
 			int color_index = 0;
-			for (int i = 0; i < 16; ++i) {
-				if (diff[i]) {
+			for (int i = 0; i < 16; ++i) 
+            {
+				if (diff[i]) 
+                {
 					int code;
-					if (opt_highlight_col == -1) {
+					if (opt_highlight_col == -1) 
+                    {
 						code = COL_UNDERLINE;
-					} else if (opt_highlight_col == 0) {
-						if (opt_highlight_fg) {
+					} 
+                    else if (opt_highlight_col == 0) 
+                    {
+						if (opt_highlight_fg) 
+                        {
 							code = colors_rainbow_fg[color_index++];
 							color_index %= sizeof(colors_rainbow_fg) / sizeof(int);
-						} else {
+						} 
+                        else 
+                        {
 							code = colors_rainbow_bg[color_index++];
 							color_index %= sizeof(colors_rainbow_bg) / sizeof(int);
 						}
-					} else {
+					} 
+                    else 
+                    {
 						if (opt_highlight_fg)
 							code = colors_rainbow_fg[opt_highlight_col - 1];
 						else
