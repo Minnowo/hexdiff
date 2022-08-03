@@ -352,7 +352,7 @@ int main(int argc, char **argv)
         
         if(skip_diff != 0)
         {
-            printf("Skipped: %i bytes \n", skip_diff);
+            printf("Skipped: %lu bytes / %lu lines \n", skip_diff, skip_diff / 16);
             skip_diff = 0;
         }
 
